@@ -1,4 +1,4 @@
-module kratosgormctl
+module github.com/fanfei93/kratosgormctl
 
 go 1.19
 
