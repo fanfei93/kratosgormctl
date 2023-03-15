@@ -45,11 +45,14 @@ import (
 type (
     {{.InnerInterfaceName}} interface {
         Insert(ctx context.Context, data *{{.BizStructName}}) (int64, error)
+		InsertWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}) (int64, error)
 		FindAfterInsert(ctx context.Context, data *{{.BizStructName}}) (*{{.BizStructName}}, error)
         FindOne(ctx context.Context, id int64, columns ...string) (*{{.BizStructName}}, error)
         Update(ctx context.Context, data *{{.BizStructName}}, columns ...string) error
+		UpdateWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}, columns ...string) error
 		FindAfterUpdate(ctx context.Context, data *{{.BizStructName}}, columns ...string) (*{{.BizStructName}}, error)
 		Delete(ctx context.Context, data *{{.BizStructName}}) error
+		DeleteWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}) error
     }
 
     {{.DefaultModelName}} struct {
@@ -67,6 +70,17 @@ func (m *{{.DefaultModelName}}) Insert(ctx context.Context, data *{{.BizStructNa
 	entityData := new({{.EntityPackageName}}.{{.EntityStructName}})
 	entityData.FromBizStruct(data)
     err := m.WithContext(ctx).Model(&{{.EntityPackageName}}.{{.EntityStructName}}{}).Create(entityData).Error
+    if err != nil {
+        return 0, err
+    }
+
+    return int64(entityData.ID), nil
+}
+
+func (m *{{.DefaultModelName}}) InsertWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}) (int64, error) {
+	entityData := new({{.EntityPackageName}}.{{.EntityStructName}})
+	entityData.FromBizStruct(data)
+    err := tx.WithContext(ctx).Model(&{{.EntityPackageName}}.{{.EntityStructName}}{}).Create(entityData).Error
     if err != nil {
         return 0, err
     }
@@ -125,6 +139,28 @@ func (m *{{.DefaultModelName}}) Update(ctx context.Context, data *{{.BizStructNa
     return nil
 }
 
+func (m *{{.DefaultModelName}}) UpdateWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}, columns ...string) error {
+    if data == nil {
+        return nil
+    }
+
+	entityData := new({{.EntityPackageName}}.{{.EntityStructName}})
+	entityData.FromBizStruct(data)
+	
+	var err error
+	if len(columns) > 0 {
+		err = tx.WithContext(ctx).Model(&{{.EntityPackageName}}.{{.EntityStructName}}{}).Select(columns).Where("id = ?", entityData.ID).Updates(entityData).Error
+	} else{
+		err = tx.WithContext(ctx).Model(&{{.EntityPackageName}}.{{.EntityStructName}}{}).Where("id = ?", entityData.ID).Updates(entityData).Error
+	}
+
+    if err != nil {
+        return err
+    }
+
+    return nil
+}
+
 func (m *{{.DefaultModelName}}) FindAfterUpdate(ctx context.Context, data *{{.BizStructName}}, columns ...string) (*{{.BizStructName}}, error) {
 	err := m.Update(ctx, data, columns...)
 	if err != nil {
@@ -145,6 +181,14 @@ func (m *{{.DefaultModelName}}) Delete(ctx context.Context, data *{{.BizStructNa
 	entityData := new({{.EntityPackageName}}.{{.EntityStructName}})
 	entityData.FromBizStruct(data)
 	err := m.WithContext(ctx).Delete(entityData).Error
+    
+    return err
+}
+
+func (m *{{.DefaultModelName}}) DeleteWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}) error {
+	entityData := new({{.EntityPackageName}}.{{.EntityStructName}})
+	entityData.FromBizStruct(data)
+	err := tx.WithContext(ctx).Delete(entityData).Error
     
     return err
 }
