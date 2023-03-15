@@ -14,4 +14,5 @@ type Config struct {
 	RepoPkgPath      string
 	RepoStructName   string
 	BizStructName    string
+	BizRepoName      string
 }

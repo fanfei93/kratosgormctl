@@ -79,7 +79,8 @@ func (g *Generator) generateRepoFile() {
 		OuterInterfaceName: outerInterfaceName,
 		DefaultModelName:   defaultModelName,
 		BizStructName:      g.BizStructName,
-		EntityStructName:   g.EntityPkgPath + "." + g.EntityStructName,
+		BizRepoName:        g.BizRepoName,
+		EntityStructName:   g.EntityStructName,
 		TableName:          g.TableName,
 	}
 
@@ -100,6 +101,9 @@ func (g *Generator) fillGenEntityFile(data *gentemplate.GenBaseStruct) {
 		panic(err)
 	}
 	baseModelPath := g.EntityOutPath + "/" + g.TableName + ".go"
+	if isExist(baseModelPath) {
+		return
+	}
 	err = os.WriteFile(baseModelPath, content, 0666)
 	if err != nil {
 		panic(err)

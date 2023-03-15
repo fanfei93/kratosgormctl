@@ -12,6 +12,24 @@ func (entity *{{.EntityStructName}}) FromBizStruct(data *{{.BizStructName}}) {
 	panic("Unrealized methods!!!")
 }
 
+func (entity *{{.EntityStructName}}) BeforeCreate(conn *gorm.DB) error {
+    // conn.Statement.SetColumn("created_at", time.Now())
+    return nil
+}
+
+func (entity *{{.EntityStructName}}) BeforeUpdate(conn *gorm.DB) (err error) {
+    // 如果任意字段有变更
+    // if conn.Statement.Changed() {
+    //     conn.Statement.SetColumn("updated_at", time.Now())
+    // }
+    return nil
+}
+
+func (entity *{{.EntityStructName}}) BeforeDelete(conn *gorm.DB) (err error) {
+    return nil
+}
+
+
 `
 
 	genRepoBase = `
@@ -138,6 +156,7 @@ import (
     "gorm.io/gorm"
 )
 
+
 var _ {{.OuterInterfaceName}} = (*custom{{.OuterInterfaceName}})(nil)
 
 type (
@@ -153,7 +172,7 @@ type (
 )
 
 // New{{.OuterInterfaceName}} returns a model for the database table.
-func New{{.OuterInterfaceName}}(conn *gorm.DB) {{.OuterInterfaceName}} {
+func New{{.OuterInterfaceName}}(conn *gorm.DB) {{.BizRepoName}} {
 	return &custom{{.OuterInterfaceName}}{
 		default{{.OuterInterfaceName}}: new{{.OuterInterfaceName}}(conn),
 	}
@@ -169,6 +188,7 @@ type (
 		OuterInterfaceName string
 		DefaultModelName   string
 		BizStructName      string
+		BizRepoName        string
 		EntityStructName   string
 		TableName          string
 	}
