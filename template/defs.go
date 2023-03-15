@@ -43,19 +43,7 @@ import (
 )
 
 type (
-    {{.InnerInterfaceName}} interface {
-        Insert(ctx context.Context, data *{{.BizStructName}}) (int64, error)
-		InsertWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}) (int64, error)
-		FindAfterInsert(ctx context.Context, data *{{.BizStructName}}) (*{{.BizStructName}}, error)
-        FindOne(ctx context.Context, id int64, columns ...string) (*{{.BizStructName}}, error)
-        Update(ctx context.Context, data *{{.BizStructName}}, columns ...string) error
-		UpdateWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}, columns ...string) error
-		FindAfterUpdate(ctx context.Context, data *{{.BizStructName}}, columns ...string) (*{{.BizStructName}}, error)
-		Delete(ctx context.Context, data *{{.BizStructName}}) error
-		DeleteWithTx(ctx context.Context, tx *gorm.DB, data *{{.BizStructName}}) error
-    }
-
-    {{.DefaultModelName}} struct {
+	{{.DefaultModelName}} struct {
         *gorm.DB
     }
 )
@@ -200,23 +188,14 @@ import (
     "gorm.io/gorm"
 )
 
-
-var _ {{.OuterInterfaceName}} = (*custom{{.OuterInterfaceName}})(nil)
-
 type (
-    // {{.OuterInterfaceName}} is an interface to be customized, add more methods here,
-    // and implement the added methods in custom{{.OuterInterfaceName}}.
-    {{.OuterInterfaceName}} interface {
-        {{.InnerInterfaceName}}
-    }
-
     custom{{.OuterInterfaceName}} struct {
         *{{.DefaultModelName}}
     }
 )
 
-// New{{.OuterInterfaceName}} returns a model for the database table.
-func New{{.OuterInterfaceName}}(conn *gorm.DB) {{.BizRepoName}} {
+// NewCustom{{.OuterInterfaceName}} returns a model for the database table.
+func NewCustom{{.OuterInterfaceName}}(conn *gorm.DB) {{.BizRepoName}} {
 	return &custom{{.OuterInterfaceName}}{
 		default{{.OuterInterfaceName}}: new{{.OuterInterfaceName}}(conn),
 	}
