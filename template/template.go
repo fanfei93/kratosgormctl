@@ -1,9 +1,13 @@
 package template
 
-func GetGenBaseTemplate() string {
-	return genBase
+func GetGenRepoBaseTemplate() string {
+	return genRepoBase
 }
 
-func GetGenCustomTemplate() string {
-	return genCustom
+func GetGenRepoCustomTemplate() string {
+	return genRepoCustom
+}
+
+func GetGenEntityCustomTemplate() string {
+	return genEntityCustom
 }

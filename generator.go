@@ -73,7 +73,8 @@ func (g *Generator) generateRepoFile() {
 	defaultModelName := "default" + outerInterfaceName
 
 	data := &gentemplate.GenBaseStruct{
-		PackageName:        g.RepoPkgPath,
+		EntityPackageName:  g.EntityPkgPath,
+		RepoPackageName:    g.RepoPkgPath,
 		InnerInterfaceName: innerInterfaceName,
 		OuterInterfaceName: outerInterfaceName,
 		DefaultModelName:   defaultModelName,
@@ -87,13 +88,30 @@ func (g *Generator) generateRepoFile() {
 		panic(err)
 	}
 
+	g.fillGenEntityFile(data)
 	g.fillGenRepoFile(data)
 	g.fillCustomRepoFile(data)
 
 }
 
+func (g *Generator) fillGenEntityFile(data *gentemplate.GenBaseStruct) {
+	content, err := g.getBaseEntityContent(data)
+	if err != nil {
+		panic(err)
+	}
+	baseModelPath := g.EntityOutPath + "/" + g.TableName + ".go"
+	err = os.WriteFile(baseModelPath, content, 0666)
+	if err != nil {
+		panic(err)
+	}
+	exec.Command("goimports", "-l", "-w", baseModelPath).Output()
+	exec.Command("gofmt", "-l", "-w", baseModelPath).Output()
+
+	g.info(baseModelPath + " Done")
+}
+
 func (g *Generator) fillGenRepoFile(data *gentemplate.GenBaseStruct) {
-	content, err := g.getBaseModelContent(data)
+	content, err := g.getBaseRepoContent(data)
 	if err != nil {
 		panic(err)
 	}
@@ -109,7 +127,7 @@ func (g *Generator) fillGenRepoFile(data *gentemplate.GenBaseStruct) {
 }
 
 func (g *Generator) fillCustomRepoFile(data *gentemplate.GenBaseStruct) {
-	content, err := g.getCustomModelContent(data)
+	content, err := g.getCustomRepoContent(data)
 	if err != nil {
 		panic(err)
 	}
@@ -127,8 +145,8 @@ func (g *Generator) fillCustomRepoFile(data *gentemplate.GenBaseStruct) {
 	g.info(baseModelPath + " Done")
 }
 
-func (g *Generator) getBaseModelContent(data *gentemplate.GenBaseStruct) ([]byte, error) {
-	parse, err := template.New("gen_base").Parse(gentemplate.GetGenBaseTemplate())
+func (g *Generator) getBaseEntityContent(data *gentemplate.GenBaseStruct) ([]byte, error) {
+	parse, err := template.New("gen_entity_base").Parse(gentemplate.GetGenEntityCustomTemplate())
 	if err != nil {
 		return nil, err
 	}
@@ -142,8 +160,23 @@ func (g *Generator) getBaseModelContent(data *gentemplate.GenBaseStruct) ([]byte
 	return buf.Bytes(), nil
 }
 
-func (g *Generator) getCustomModelContent(data *gentemplate.GenBaseStruct) ([]byte, error) {
-	parse, err := template.New("gen_custom").Parse(gentemplate.GetGenCustomTemplate())
+func (g *Generator) getBaseRepoContent(data *gentemplate.GenBaseStruct) ([]byte, error) {
+	parse, err := template.New("gen_repo_base").Parse(gentemplate.GetGenRepoBaseTemplate())
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	err = parse.Execute(&buf, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (g *Generator) getCustomRepoContent(data *gentemplate.GenBaseStruct) ([]byte, error) {
+	parse, err := template.New("gen_repo_custom").Parse(gentemplate.GetGenRepoCustomTemplate())
 	if err != nil {
 		return nil, err
 	}
