@@ -8,7 +8,6 @@
         "github.com/fanfei93/kratosgormctl"
         "gorm.io/driver/mysql"
         "gorm.io/gorm"
-        "testing"
     )
 
     ...
@@ -39,7 +38,6 @@
         "github.com/fanfei93/kratosgormctl"
         "gorm.io/driver/mysql"
         "gorm.io/gorm"
-		"testing"
     )
 
     ...
