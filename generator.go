@@ -4,14 +4,16 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	gentemplate "github.com/fanfei93/kratosgormctl/template"
+	tmpl "github.com/fanfei93/kratosgormctl/template"
 	"gorm.io/gen"
 	"gorm.io/gorm"
+	"io"
 	"log"
 	"os"
 	"os/exec"
 	"strings"
 	"text/template"
+	// tmpl "gorm.io/gen/internal/template"
 )
 
 type Generator struct {
@@ -19,6 +21,14 @@ type Generator struct {
 }
 
 func NewGenerator(cfg Config) *Generator {
+	if cfg.EntityFileName == "" {
+		cfg.EntityFileName = cfg.TableName
+	}
+
+	if cfg.EntityOutPath != cfg.RepoOutPath {
+		cfg.separateEntity = true
+	}
+
 	generator := &Generator{
 		Config: cfg,
 	}
@@ -42,28 +52,85 @@ func (g *Generator) info(logInfos ...string) {
 
 func (g *Generator) Execute() {
 	g.info("Start generating code.")
-	g.generateEntityFile()
-	g.generateRepoFile()
+	g.generateFile()
 	g.info("Generate code done.")
 }
 
-func (g *Generator) generateEntityFile() {
+func (g *Generator) getEntityGenContent() []byte {
 	generator := gen.NewGenerator(gen.Config{
 		ModelPkgPath: g.EntityOutPath,
 	})
 
 	generator.UseDB(g.db)
 
-	if g.EntityStructName != "" {
-		generator.GenerateModelAs(g.TableName, g.EntityStructName)
-	} else {
-		generator.GenerateModel(g.TableName)
+	data := generator.GenerateModelAs(g.TableName, g.EntityStructName)
+	if g.EntityStructName == "" {
+		data = generator.GenerateModel(g.TableName)
 		g.EntityStructName = getCamelName(g.TableName)
 	}
-	generator.Execute()
+
+	if data == nil || !data.Generated {
+		panic("getEntityFileContent failed with data invalid")
+	}
+
+	var buf bytes.Buffer
+	err := render(tmpl.Model, &buf, data)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, method := range data.ModelMethods {
+		err = render(tmpl.ModelMethod, &buf, method)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return buf.Bytes()
 }
 
-func (g *Generator) generateRepoFile() {
+func (g *Generator) getEntityGenContentWithSeparate() []byte {
+	generator := gen.NewGenerator(gen.Config{
+		ModelPkgPath: g.EntityOutPath,
+	})
+
+	generator.UseDB(g.db)
+
+	data := generator.GenerateModelAs(g.TableName, g.EntityStructName)
+	if g.EntityStructName == "" {
+		data = generator.GenerateModel(g.TableName)
+		g.EntityStructName = getCamelName(g.TableName)
+	}
+
+	if data == nil || !data.Generated {
+		panic("getEntityFileContent failed with data invalid")
+	}
+
+	var buf bytes.Buffer
+	err := render(tmpl.ModelWithSeparate, &buf, data)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, method := range data.ModelMethods {
+		err = render(tmpl.ModelMethod, &buf, method)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return buf.Bytes()
+}
+
+func render(tmpl string, wr io.Writer, data interface{}) error {
+	t, err := template.New(tmpl).Parse(tmpl)
+	if err != nil {
+		return err
+	}
+	return t.Execute(wr, data)
+}
+
+func (g *Generator) generateFile() {
 	structName := getCamelName(g.TableName)
 	if g.RepoStructName != "" {
 		structName = g.RepoStructName
@@ -72,7 +139,7 @@ func (g *Generator) generateRepoFile() {
 	innerInterfaceName := strings.ToLower(outerInterfaceName[:1]) + outerInterfaceName[1:]
 	defaultModelName := "default" + outerInterfaceName
 
-	data := &gentemplate.GenBaseStruct{
+	data := &tmpl.GenBaseStruct{
 		EntityPackageName:  g.EntityPkgPath,
 		RepoPackageName:    g.RepoPkgPath,
 		InnerInterfaceName: innerInterfaceName,
@@ -89,22 +156,27 @@ func (g *Generator) generateRepoFile() {
 		panic(err)
 	}
 
-	g.fillGenEntityFile(data)
-	g.fillGenRepoFile(data)
-	g.fillCustomRepoFile(data)
+	if g.separateEntity {
+		genContent := g.getEntityGenContentWithSeparate()
+		customContent, err := g.getEntityCustomContentWithSeparate(data)
+		if err != nil {
+			panic(err)
+		}
 
+		modelFile := g.EntityOutPath + "/" + g.EntityFileName + ".gen.go"
+		g.fillGenEntityFile(genContent, modelFile)
+		g.fillCustomEntityFile(customContent, data)
+		g.fillGenRepoFile(data, nil)
+		g.fillCustomRepoFile(data, true)
+	} else {
+		genContent := g.getEntityGenContent()
+		g.fillGenRepoFile(data, genContent)
+		g.fillCustomRepoFile(data, false)
+	}
 }
 
-func (g *Generator) fillGenEntityFile(data *gentemplate.GenBaseStruct) {
-	content, err := g.getBaseEntityContent(data)
-	if err != nil {
-		panic(err)
-	}
-	baseModelPath := g.EntityOutPath + "/" + g.TableName + ".go"
-	if isExist(baseModelPath) {
-		return
-	}
-	err = os.WriteFile(baseModelPath, content, 0666)
+func (g *Generator) fillGenEntityFile(content []byte, baseModelPath string) {
+	err := os.WriteFile(baseModelPath, content, 0666)
 	if err != nil {
 		panic(err)
 	}
@@ -114,11 +186,34 @@ func (g *Generator) fillGenEntityFile(data *gentemplate.GenBaseStruct) {
 	g.info(baseModelPath + " Done")
 }
 
-func (g *Generator) fillGenRepoFile(data *gentemplate.GenBaseStruct) {
-	content, err := g.getBaseRepoContent(data)
+func (g *Generator) fillCustomEntityFile(content []byte, data *tmpl.GenBaseStruct) {
+	baseModelPath := g.EntityOutPath + "/" + g.TableName + ".go"
+	if isExist(baseModelPath) {
+		return
+	}
+	err := os.WriteFile(baseModelPath, content, 0666)
 	if err != nil {
 		panic(err)
 	}
+	exec.Command("goimports", "-l", "-w", baseModelPath).Output()
+	exec.Command("gofmt", "-l", "-w", baseModelPath).Output()
+
+	g.info(baseModelPath + " Done")
+}
+
+func (g *Generator) fillGenRepoFile(data *tmpl.GenBaseStruct, entityContent []byte) {
+	var err error
+	var content []byte
+	if len(entityContent) > 0 {
+		data.EntityContent = string(entityContent)
+		content, err = g.getBaseRepoWithEntityContent(data)
+	} else {
+		content, err = g.getBaseRepoContent(data)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	baseModelPath := g.RepoOutPath + "/" + g.RepoFileName + "_model_gen.go"
 	err = os.WriteFile(baseModelPath, content, 0666)
 	if err != nil {
@@ -130,11 +225,21 @@ func (g *Generator) fillGenRepoFile(data *gentemplate.GenBaseStruct) {
 	g.info(baseModelPath + " Done")
 }
 
-func (g *Generator) fillCustomRepoFile(data *gentemplate.GenBaseStruct) {
-	content, err := g.getCustomRepoContent(data)
-	if err != nil {
-		panic(err)
+func (g *Generator) fillCustomRepoFile(data *tmpl.GenBaseStruct, separateEntity bool) {
+	var content []byte
+	var err error
+	if separateEntity {
+		content, err = g.getCustomRepoContent(data)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		content, err = g.getCustomRepoWithEntityContent(data)
+		if err != nil {
+			panic(err)
+		}
 	}
+
 	baseModelPath := g.RepoOutPath + "/" + g.RepoFileName + "_model.go"
 	if isExist(baseModelPath) {
 		return
@@ -149,8 +254,8 @@ func (g *Generator) fillCustomRepoFile(data *gentemplate.GenBaseStruct) {
 	g.info(baseModelPath + " Done")
 }
 
-func (g *Generator) getBaseEntityContent(data *gentemplate.GenBaseStruct) ([]byte, error) {
-	parse, err := template.New("gen_entity_base").Parse(gentemplate.GetGenEntityCustomTemplate())
+func (g *Generator) getEntityCustomContentWithSeparate(data *tmpl.GenBaseStruct) ([]byte, error) {
+	parse, err := template.New("gen_entity_base").Parse(tmpl.GetGenEntityCustomTemplate())
 	if err != nil {
 		return nil, err
 	}
@@ -164,8 +269,22 @@ func (g *Generator) getBaseEntityContent(data *gentemplate.GenBaseStruct) ([]byt
 	return buf.Bytes(), nil
 }
 
-func (g *Generator) getBaseRepoContent(data *gentemplate.GenBaseStruct) ([]byte, error) {
-	parse, err := template.New("gen_repo_base").Parse(gentemplate.GetGenRepoBaseTemplate())
+func (g *Generator) getBaseRepoContent(data *tmpl.GenBaseStruct) ([]byte, error) {
+	parse, err := template.New("gen_repo_base").Parse(tmpl.GetGenRepoBaseTemplate())
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	err = parse.Execute(&buf, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+func (g *Generator) getBaseRepoWithEntityContent(data *tmpl.GenBaseStruct) ([]byte, error) {
+	parse, err := template.New("gen_repo_base").Parse(tmpl.GetGenRepoBaseWithEntityTemplate())
 	if err != nil {
 		return nil, err
 	}
@@ -179,8 +298,23 @@ func (g *Generator) getBaseRepoContent(data *gentemplate.GenBaseStruct) ([]byte,
 	return buf.Bytes(), nil
 }
 
-func (g *Generator) getCustomRepoContent(data *gentemplate.GenBaseStruct) ([]byte, error) {
-	parse, err := template.New("gen_repo_custom").Parse(gentemplate.GetGenRepoCustomTemplate())
+func (g *Generator) getCustomRepoContent(data *tmpl.GenBaseStruct) ([]byte, error) {
+	parse, err := template.New("gen_repo_custom").Parse(tmpl.GetGenRepoCustomTemplate())
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	err = parse.Execute(&buf, data)
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (g *Generator) getCustomRepoWithEntityContent(data *tmpl.GenBaseStruct) ([]byte, error) {
+	parse, err := template.New("gen_repo_custom_with_entity").Parse(tmpl.GetGenRepoWithEntityCustomTemplate())
 	if err != nil {
 		return nil, err
 	}
