@@ -25,8 +25,10 @@ func NewGenerator(cfg Config) *Generator {
 		cfg.EntityFileName = cfg.TableName
 	}
 
-	if cfg.EntityOutPath != cfg.RepoOutPath {
-		cfg.separateEntity = true
+	cfg.separateEntity = true
+	if cfg.EntityOutPath == "" {
+		cfg.separateEntity = false
+		cfg.EntityOutPath = cfg.RepoOutPath
 	}
 
 	generator := &Generator{
