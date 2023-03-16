@@ -214,7 +214,7 @@ func (g *Generator) fillGenRepoFile(data *tmpl.GenBaseStruct, entityContent []by
 		}
 	}
 
-	baseModelPath := g.RepoOutPath + "/" + g.RepoFileName + "_model_gen.go"
+	baseModelPath := g.RepoOutPath + "/" + g.RepoFileName + ".gen.go"
 	err = os.WriteFile(baseModelPath, content, 0666)
 	if err != nil {
 		panic(err)
@@ -240,7 +240,7 @@ func (g *Generator) fillCustomRepoFile(data *tmpl.GenBaseStruct, separateEntity 
 		}
 	}
 
-	baseModelPath := g.RepoOutPath + "/" + g.RepoFileName + "_model.go"
+	baseModelPath := g.RepoOutPath + "/" + g.RepoFileName + ".go"
 	if isExist(baseModelPath) {
 		return
 	}
