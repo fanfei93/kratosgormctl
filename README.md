@@ -1,8 +1,8 @@
-## KratosGormctl
+# KratosGormctl
 目的：为使用kratos框架的项目自动生成基于gorm的data层代码
 
-### 使用方式
-1. entity和repo分离的场景
+## 使用方式
+### 1. entity和repo分离的场景
 ```go
     import (
         "github.com/fanfei93/kratosgormctl"
