@@ -14,7 +14,7 @@
 
     db, _ := gorm.Open(mysql.Open("root:@(127.0.0.1:3306)/db?charset=utf8mb4&parseTime=True&loc=Local"))
     g := kratosgormctl.NewGenerator(kratosgormctl.Config{
-        EntityOutPath: "./entity",          // entity文件生成位置，推荐使用绝对路径
+        EntityOutPath: "./entity",          // entity文件生成位置，推荐使用绝对路径, 若目录不存在会自动创建
         EntityPkgPath:    "entity",         // entity文件包名
         TableName:        "user_info",      // 表名
         EntityStructName: "UserEntity",     // 生成的Entity sturct名称
