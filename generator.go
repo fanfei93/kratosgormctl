@@ -133,6 +133,13 @@ func render(tmpl string, wr io.Writer, data interface{}) error {
 }
 
 func (g *Generator) generateFile() {
+	if err := os.MkdirAll(g.RepoOutPath, os.ModePerm); err != nil {
+		err := fmt.Errorf("make dir outpath(%s) fail: %s", g.RepoOutPath, err)
+		panic(err)
+	}
+
+	if err := os.MkdirAll(g.E)
+
 	structName := getCamelName(g.TableName)
 	if g.RepoStructName != "" {
 		structName = g.RepoStructName
@@ -153,10 +160,7 @@ func (g *Generator) generateFile() {
 		TableName:          g.TableName,
 	}
 
-	if err := os.MkdirAll(g.RepoOutPath, os.ModePerm); err != nil {
-		err := fmt.Errorf("make dir outpath(%s) fail: %s", g.RepoOutPath, err)
-		panic(err)
-	}
+
 
 	if g.separateEntity {
 		genContent := g.getEntityGenContentWithSeparate()
