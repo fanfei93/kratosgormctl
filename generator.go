@@ -138,7 +138,10 @@ func (g *Generator) generateFile() {
 		panic(err)
 	}
 
-	if err := os.MkdirAll(g.E)
+	if err := os.MkdirAll(g.EntityOutPath, os.ModePerm); err != nil {
+		err := fmt.Errorf("make dir outpath(%s) fail: %s", g.EntityOutPath, err)
+		panic(err)
+	}
 
 	structName := getCamelName(g.TableName)
 	if g.RepoStructName != "" {
@@ -159,8 +162,6 @@ func (g *Generator) generateFile() {
 		EntityStructName:   g.EntityStructName,
 		TableName:          g.TableName,
 	}
-
-
 
 	if g.separateEntity {
 		genContent := g.getEntityGenContentWithSeparate()
