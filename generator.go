@@ -94,7 +94,8 @@ func (g *Generator) getEntityGenContent() []byte {
 
 func (g *Generator) getEntityGenContentWithSeparate() []byte {
     generator := gen.NewGenerator(gen.Config{
-        ModelPkgPath: g.EntityOutPath,
+        ModelPkgPath:  g.EntityOutPath,
+        FieldSignable: true,
     })
 
     generator.UseDB(g.db)
